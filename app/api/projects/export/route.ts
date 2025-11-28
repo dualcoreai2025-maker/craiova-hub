@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabaseClient'; // folosim clientul global
+import { supabase } from '@/lib/supabaseClient';
 
 export async function GET() {
   const { data, error } = await supabase
@@ -13,7 +13,6 @@ export async function GET() {
     );
   }
 
-  // transformăm în CSV simplu
   const header = ['id', 'team_id', 'title', 'repo_url', 'demo_url', 'created_at'];
 
   const rows =
