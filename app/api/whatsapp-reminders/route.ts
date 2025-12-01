@@ -1,23 +1,40 @@
 // app/api/whatsapp-reminders/route.ts
 import { NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import twilio from 'twilio';
+import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
 const client = twilio(
   process.env.TWILIO_ACCOUNT_SID!,
   process.env.TWILIO_AUTH_TOKEN!
 );
 
-const REMINDER_WINDOW_MINUTES = 5; // rulezi cron la 5 minute
+// câte minute avem "fereastra" în care acceptăm trimiterea reminder-ului
+const REMINDER_WINDOW_MINUTES = 5;
+
+type Profile = {
+  full_name: string | null;
+  phone_number: string | null;
+  whatsapp_opt_in: boolean | null;
+};
+
+type EventWithProfile = {
+  id: string;
+  title: string;                // schimbă dacă la tine coloana se numește altfel
+  start_time: string;           // la fel, pune numele real din tabel
+  reminder_minutes_before: number;
+  reminder_sent_whatsapp: boolean;
+  profiles: Profile[];          // IMPORTANT: e un array de Profile
+};
 
 export async function GET() {
   const now = new Date();
   const nowIso = now.toISOString();
+  const twoHoursLaterIso = new Date(
+    now.getTime() + 2 * 60 * 60 * 1000
+  ).toISOString();
 
-  // 1. Luăm evenimentele din următoarele 2 ore la care nu s-a trimis reminder
-  const twoHoursLater = new Date(now.getTime() + 2 * 60 * 60 * 1000).toISOString();
-
-  const { data: events, error } = await supabaseAdmin
+  // 1. Luăm evenimentele care încep în următoarele 2 ore și n-au reminder trimis
+  const { data, error } = await supabaseAdmin
     .from('events')
     .select(`
       id,
@@ -33,24 +50,24 @@ export async function GET() {
     `)
     .eq('reminder_sent_whatsapp', false)
     .gte('start_time', nowIso)
-    .lte('start_time', twoHoursLater);
+    .lte('start_time', twoHoursLaterIso);
 
   if (error) {
     console.error('Supabase error', error);
-    return NextResponse.json({ error: 'db error' }, { status: 500 });
+    return NextResponse.json({ ok: false, error: 'db error' }, { status: 500 });
   }
 
-  if (!events || events.length === 0) {
-    return NextResponse.json({ message: 'no events' });
-  }
+  const events = (data ?? []) as EventWithProfile[];
 
   const results: any[] = [];
 
   for (const event of events) {
-    const profile = event.profiles;
-    if (!profile?.phone_number || profile?.whatsapp_opt_in === false) {
-      continue;
-    }
+    // ⚠️ AICI era problema:
+    // event.profiles este un ARRAY, luăm primul element
+    const profile = event.profiles?.[0];
+
+    if (!profile) continue;
+    if (!profile.phone_number || profile.whatsapp_opt_in === false) continue;
 
     const start = new Date(event.start_time);
     const reminderTime = new Date(
@@ -60,29 +77,29 @@ export async function GET() {
     const diffMinutes =
       (now.getTime() - reminderTime.getTime()) / (60 * 1000);
 
-    // trimitem dacă suntem în fereastra [-REMINDER_WINDOW, 0] minute
-    if (
-      diffMinutes >= 0 &&
-      diffMinutes <= REMINDER_WINDOW_MINUTES
-    ) {
-      const body = `Salut${profile.full_name ? ' ' + profile.full_name : ''}! 👋
+    // trimitem doar dacă suntem în fereastra [0, REMINDER_WINDOW_MINUTES] după reminderTime
+    if (diffMinutes >= 0 && diffMinutes <= REMINDER_WINDOW_MINUTES) {
+      const body = `Salut${
+        profile.full_name ? ' ' + profile.full_name : ''
+      }! 👋
 Îți reamintim că sesiunea "${event.title}" începe la ${start.toLocaleString()}.`;
 
       try {
         const msg = await client.messages.create({
           from: process.env.TWILIO_WHATSAPP_FROM!,
+          // în DB păstrăm doar +407..., aici adăugăm prefixul "whatsapp:"
           to: `whatsapp:${profile.phone_number}`,
           body,
         });
 
-        // marcăm în DB că am trimis reminder-ul
+        // marcăm că am trimis reminder-ul
         const { error: updateError } = await supabaseAdmin
           .from('events')
           .update({ reminder_sent_whatsapp: true })
           .eq('id', event.id);
 
         if (updateError) {
-          console.error('update error', updateError);
+          console.error('update reminder_sent_whatsapp error', updateError);
         }
 
         results.push({ eventId: event.id, status: 'sent', sid: msg.sid });
