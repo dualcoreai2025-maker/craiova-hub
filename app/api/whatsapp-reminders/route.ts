@@ -1,114 +1,106 @@
 // app/api/whatsapp-reminders/route.ts
-import { NextResponse } from 'next/server';
-import twilio from 'twilio';
-import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { NextResponse } from "next/server";
+import twilio from "twilio";
+import { createClient } from "@supabase/supabase-js";
 
-const client = twilio(
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
+const twilioClient = twilio(
   process.env.TWILIO_ACCOUNT_SID!,
   process.env.TWILIO_AUTH_TOKEN!
 );
 
-// câte minute avem "fereastra" în care acceptăm trimiterea reminder-ului
-const REMINDER_WINDOW_MINUTES = 5;
+const WHATSAPP_FROM = process.env.TWILIO_WHATSAPP_FROM!;
 
-type Profile = {
-  full_name: string | null;
-  phone_number: string | null;
-  whatsapp_opt_in: boolean | null;
-};
-
-type EventWithProfile = {
-  id: string;
-  title: string;                // schimbă dacă la tine coloana se numește altfel
-  start_time: string;           // la fel, pune numele real din tabel
-  reminder_minutes_before: number;
-  reminder_sent_whatsapp: boolean;
-  profiles: Profile[];          // IMPORTANT: e un array de Profile
-};
+// vrem reminder cu 5 minute înainte
+const REMINDER_MINUTES = 5;
+// fereastra în care considerăm că e „momentul potrivit”
+const WINDOW_MINUTES = 1; // job-ul rulează la fiecare minut
 
 export async function GET() {
   const now = new Date();
-  const nowIso = now.toISOString();
-  const twoHoursLaterIso = new Date(
-    now.getTime() + 2 * 60 * 60 * 1000
-  ).toISOString();
+  const from = new Date(now.getTime() + REMINDER_MINUTES * 60_000);
+  const to = new Date(from.getTime() + WINDOW_MINUTES * 60_000);
 
-  // 1. Luăm evenimentele care încep în următoarele 2 ore și n-au reminder trimis
-  const { data, error } = await supabaseAdmin
-    .from('events')
-    .select(`
-      id,
-      title,
-      start_time,
-      reminder_minutes_before,
-      reminder_sent_whatsapp,
-      profiles (
-        full_name,
-        phone_number,
-        whatsapp_opt_in
+  try {
+    // 1️⃣ Luăm evenimentele care încep peste 5–6 minute și nu au reminder trimis
+    const { data: events, error } = await supabaseAdmin
+      .from("events")
+      .select(
+        `
+        id,
+        title,
+        start_time,
+        reminder_sent_whatsapp,
+        reminder_minutes_before,
+        profiles (
+          id,
+          full_name,
+          phone_number,
+          whatsapp_opt_in
+        )
+      `
       )
-    `)
-    .eq('reminder_sent_whatsapp', false)
-    .gte('start_time', nowIso)
-    .lte('start_time', twoHoursLaterIso);
+      .eq("reminder_sent_whatsapp", false)
+      .gte("start_time", from.toISOString())
+      .lt("start_time", to.toISOString());
 
-  if (error) {
-    console.error('Supabase error', error);
-    return NextResponse.json({ ok: false, error: 'db error' }, { status: 500 });
-  }
+    if (error) {
+      console.error("Supabase error:", error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
 
-  const events = (data ?? []) as EventWithProfile[];
+    let sent = 0;
 
-  const results: any[] = [];
+    for (const ev of events ?? []) {
+      const profile: any = (ev as any).profiles;
 
-  for (const event of events) {
-    // ⚠️ AICI era problema:
-    // event.profiles este un ARRAY, luăm primul element
-    const profile = event.profiles?.[0];
+      // dacă nu avem număr de telefon sau nu vrea WhatsApp, sărim
+      if (!profile || !profile.phone_number || profile.whatsapp_opt_in === false) {
+        continue;
+      }
 
-    if (!profile) continue;
-    if (!profile.phone_number || profile.whatsapp_opt_in === false) continue;
+      const start = new Date((ev as any).start_time);
+      const minutesBefore =
+        (ev as any).reminder_minutes_before ?? REMINDER_MINUTES;
 
-    const start = new Date(event.start_time);
-    const reminderTime = new Date(
-      start.getTime() - event.reminder_minutes_before * 60 * 1000
-    );
+      const ora = start.toLocaleTimeString("ro-RO", {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
 
-    const diffMinutes =
-      (now.getTime() - reminderTime.getTime()) / (60 * 1000);
-
-    // trimitem doar dacă suntem în fereastra [0, REMINDER_WINDOW_MINUTES] după reminderTime
-    if (diffMinutes >= 0 && diffMinutes <= REMINDER_WINDOW_MINUTES) {
+      const toWhatsApp = `whatsapp:${profile.phone_number}`; // 🔹 AICI "whatsapp:" e STRING
       const body = `Salut${
-        profile.full_name ? ' ' + profile.full_name : ''
-      }! 👋
-Îți reamintim că sesiunea "${event.title}" începe la ${start.toLocaleString()}.`;
+        profile.full_name ? " " + profile.full_name : ""
+      }! 👋 Evenimentul "${(ev as any).title}" începe la ${ora} (în aproximativ ${minutesBefore} minute).`;
 
       try {
-        const msg = await client.messages.create({
-          from: process.env.TWILIO_WHATSAPP_FROM!,
-          // în DB păstrăm doar +407..., aici adăugăm prefixul "whatsapp:"
-          to: `whatsapp:${profile.phone_number}`,
+        await twilioClient.messages.create({
+          from: WHATSAPP_FROM,
+          to: toWhatsApp,
           body,
         });
 
-        // marcăm că am trimis reminder-ul
-        const { error: updateError } = await supabaseAdmin
-          .from('events')
+        await supabaseAdmin
+          .from("events")
           .update({ reminder_sent_whatsapp: true })
-          .eq('id', event.id);
+          .eq("id", (ev as any).id);
 
-        if (updateError) {
-          console.error('update reminder_sent_whatsapp error', updateError);
-        }
-
-        results.push({ eventId: event.id, status: 'sent', sid: msg.sid });
+        sent++;
       } catch (err) {
-        console.error('Twilio error', err);
-        results.push({ eventId: event.id, status: 'error' });
+        console.error("Twilio error pentru event", (ev as any).id, err);
       }
     }
-  }
 
-  return NextResponse.json({ ok: true, results });
+    return NextResponse.json({ ok: true, sent });
+  } catch (err: any) {
+    console.error("Unexpected error:", err);
+    return NextResponse.json(
+      { error: err?.message ?? String(err) },
+      { status: 500 }
+    );
+  }
 }
