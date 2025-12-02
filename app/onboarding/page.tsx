@@ -13,6 +13,10 @@ export default function OnboardingPage() {
   const [github, setGithub] = useState("");
   const [linkedin, setLinkedin] = useState("");
 
+  // 👇 noi
+  const [phone, setPhone] = useState("");
+  const [whatsappOptIn, setWhatsappOptIn] = useState(false);
+
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -21,7 +25,9 @@ export default function OnboardingPage() {
     setErrorMsg(null);
 
     // Obține user-ul logat
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     if (!user) {
       setErrorMsg("Nu ești logat.");
       setSaving(false);
@@ -32,7 +38,7 @@ export default function OnboardingPage() {
     const payload = {
       id: user.id,
       full_name: fullName,
-      role: "participant",  // 👈 setat AUTOMAT
+      role: "participant", // setat AUTOMAT
       skills: skills
         .split(",")
         .map((s) => s.trim())
@@ -42,6 +48,9 @@ export default function OnboardingPage() {
         github,
         linkedin,
       },
+      // 👇 câmpurile noi pentru WhatsApp
+      phone_number: phone || null,
+      whatsapp_opt_in: whatsappOptIn,
     };
 
     // Salvăm în Supabase
@@ -61,7 +70,6 @@ export default function OnboardingPage() {
   return (
     <div className="min-h-screen flex justify-center items-center bg-slate-950 text-white">
       <div className="w-full max-w-lg space-y-4 p-6 border border-slate-800 rounded-lg bg-slate-900">
-
         <h1 className="text-2xl font-bold mb-4">Completează profilul</h1>
 
         <div className="space-y-2">
@@ -72,6 +80,32 @@ export default function OnboardingPage() {
             onChange={(e) => setFullName(e.target.value)}
           />
         </div>
+
+        {/* Telefon + opt-in WhatsApp */}
+        <div className="space-y-2">
+          <label className="block text-sm font-medium">
+            Telefon (WhatsApp)
+          </label>
+          <input
+            className="border border-slate-700 bg-slate-800 p-2 w-full rounded"
+            placeholder="+40712345678"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+          />
+          <p className="text-xs text-slate-400">
+            Folosește format internațional, ex. +40712345678.
+          </p>
+        </div>
+
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={whatsappOptIn}
+            onChange={(e) => setWhatsappOptIn(e.target.checked)}
+          />
+          Vreau să primesc notificări pe WhatsApp (reminder înainte de
+          eveniment).
+        </label>
 
         {/* Rolul nu mai apare în UI */}
 
@@ -89,7 +123,7 @@ export default function OnboardingPage() {
 
         <div className="space-y-2">
           <label className="block text-sm font-medium">
-            Status (cauti echipă? ai echipă?)
+            Status (cauți echipă? ai echipă?)
           </label>
           <input
             className="border border-slate-700 bg-slate-800 p-2 w-full rounded"
@@ -119,9 +153,7 @@ export default function OnboardingPage() {
           />
         </div>
 
-        {errorMsg && (
-          <p className="text-sm text-red-400">{errorMsg}</p>
-        )}
+        {errorMsg && <p className="text-sm text-red-400">{errorMsg}</p>}
 
         <button
           onClick={handleSave}

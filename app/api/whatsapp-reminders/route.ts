@@ -18,13 +18,13 @@ const WHATSAPP_FROM = process.env.TWILIO_WHATSAPP_FROM!;
 const REMINDER_MINUTES = 5; // cu cât timp înainte
 const WINDOW_MINUTES = 1;   // rulăm endpoint-ul la fiecare minut
 
+
 export async function GET() {
   const now = new Date();
   const from = new Date(now.getTime() + REMINDER_MINUTES * 60_000);
   const to = new Date(from.getTime() + WINDOW_MINUTES * 60_000);
 
   try {
-    // 1️⃣ Event-uri care încep peste 5–6 minute și nu au reminder trimis
     const { data: events, error: eventsError } = await supabaseAdmin
       .from("events")
       .select("id, title, start_time, reminder_sent_whatsapp, profile_id")
@@ -45,7 +45,6 @@ export async function GET() {
     let sentCount = 0;
 
     for (const ev of events as any[]) {
-      // 2️⃣ Luăm profilul asociat (fără .single())
       const { data: profiles, error: profileError } = await supabaseAdmin
         .from("profiles")
         .select("id, full_name, phone_number, whatsapp_opt_in")
@@ -57,23 +56,11 @@ export async function GET() {
       }
 
       const profile = profiles && profiles[0];
-      if (!profile) {
-        console.warn("No profile found for event", ev.id);
-        continue;
-      }
-
-      if (!profile.phone_number) {
-        console.warn("No phone_number for profile", profile.id);
-        continue;
-      }
-
-      if (profile.whatsapp_opt_in === false) {
-        console.warn("User opted out of WhatsApp", profile.id);
-        continue;
-      }
+      if (!profile) continue;
+      if (!profile.phone_number) continue;
+      if (profile.whatsapp_opt_in === false) continue;
 
       const toWhatsApp = `whatsapp:${profile.phone_number}`;
-
       const start = new Date(ev.start_time);
       const ora = start.toLocaleTimeString("ro-RO", {
         hour: "2-digit",
@@ -85,20 +72,41 @@ export async function GET() {
       }! 👋 Evenimentul "${ev.title}" începe la ${ora} (în ~${REMINDER_MINUTES} minute).`;
 
       try {
-        await twilioClient.messages.create({
+        const msg = await twilioClient.messages.create({
           from: WHATSAPP_FROM,
           to: toWhatsApp,
           body,
         });
 
+        // log în tabelul notifications
+        await supabaseAdmin.from("notifications").insert({
+          event_id: ev.id,
+          profile_id: profile.id,
+          channel: "whatsapp",
+          message: body,
+          status: msg.status ?? "queued",
+          error_code: msg.errorCode ? String(msg.errorCode) : null,
+        });
+
+        // marcăm eventul ca notificat
         await supabaseAdmin
           .from("events")
           .update({ reminder_sent_whatsapp: true })
           .eq("id", ev.id);
 
         sentCount++;
-      } catch (err) {
+      } catch (err: any) {
         console.error("Twilio error pentru event", ev.id, err);
+
+        // log și erorile, să le vezi în notifications
+        await supabaseAdmin.from("notifications").insert({
+          event_id: ev.id,
+          profile_id: profile.id,
+          channel: "whatsapp",
+          message: body,
+          status: "error",
+          error_code: err?.code ? String(err.code) : err?.message ?? null,
+        });
       }
     }
 
@@ -111,3 +119,4 @@ export async function GET() {
     );
   }
 }
+
