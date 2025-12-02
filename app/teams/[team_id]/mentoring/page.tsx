@@ -1,132 +1,246 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
+import { useRouter } from "next/navigation";
 
-type Slot = {
+type ProfileRow = {
   id: string;
-  start_time: string;
-  end_time: string;
+  full_name: string | null;
+  role: string | null;
+  skills: string[] | string | null;
+  looking_status: string | null;
+  links: {
+    github?: string | null;
+    linkedin?: string | null;
+  } | null;
+  phone_number: string | null;
+  whatsapp_opt_in: boolean | null;
 };
 
-export default function TeamMentoringPage() {
-  const params = useParams() as { team_id?: string };
-  const teamId = params.team_id;
+export default function OnboardingPage() {
+  const router = useRouter();
 
-  const [slots, setSlots] = useState<Slot[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [fullName, setFullName] = useState("");
+  const [skills, setSkills] = useState("");
+  const [lookingStatus, setLookingStatus] = useState("");
+  const [github, setGithub] = useState("");
+  const [linkedin, setLinkedin] = useState("");
+  const [phone, setPhone] = useState("");
+  const [whatsappOptIn, setWhatsappOptIn] = useState(false);
+
+  const [saving, setSaving] = useState(false);
+  const [loadingProfile, setLoadingProfile] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [bookingMsg, setBookingMsg] = useState<string | null>(null);
 
-  // 1. load sloturi libere
+  // 1️⃣ Încarcă profilul existent la mount
   useEffect(() => {
-    const loadSlots = async () => {
-      setLoading(true);
+    const loadProfile = async () => {
+      setLoadingProfile(true);
       setErrorMsg(null);
 
-      const { data, error } = await supabase
-        .from("mentoring_slots")
-        .select("id, start_time, end_time")
-        .eq("is_booked", false)
-        .gt("start_time", new Date().toISOString())
-        .order("start_time", { ascending: true });
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
 
-      if (error) {
-        setErrorMsg(error.message);
-        setSlots([]);
-      } else {
-        setSlots(data as Slot[]);
+      if (userError || !user) {
+        console.log("Onboarding: no user", userError);
+        setErrorMsg("Nu ești logat.");
+        setLoadingProfile(false);
+        return;
       }
 
-      setLoading(false);
+      console.log("Onboarding: current user id =", user.id);
+
+      const { data, error } = await supabase
+        .from("profiles")
+        .select(
+          "id, full_name, role, skills, looking_status, links, phone_number, whatsapp_opt_in"
+        )
+        .eq("id", user.id)
+        .maybeSingle();
+
+      console.log("Onboarding: loaded profile =", { data, error });
+
+      if (error) {
+        // Dacă nu există rând (cod PGRST116) nu e grav, lăsăm câmpurile goale
+        if ((error as any).code !== "PGRST116") {
+          console.error("Supabase profile error:", error);
+          setErrorMsg("Nu am putut încărca profilul.");
+        }
+      } else if (data) {
+        const p = data as ProfileRow;
+
+        setFullName(p.full_name ?? "");
+
+        if (Array.isArray(p.skills)) {
+          setSkills(p.skills.join(", "));
+        } else if (typeof p.skills === "string") {
+          setSkills(p.skills);
+        } else {
+          setSkills("");
+        }
+
+        setLookingStatus(p.looking_status ?? "");
+
+        const links = p.links || {};
+        setGithub(links.github ?? "");
+        setLinkedin(links.linkedin ?? "");
+
+        setPhone(p.phone_number ?? "");
+        setWhatsappOptIn(p.whatsapp_opt_in ?? false);
+      }
+
+      setLoadingProfile(false);
     };
 
-    loadSlots();
+    loadProfile();
   }, []);
 
-  const handleBook = async (slotId: string) => {
-    if (!teamId) {
-      setBookingMsg("Lipsă team_id în URL.");
+  const handleSave = async () => {
+    setSaving(true);
+    setErrorMsg(null);
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      setErrorMsg("Nu ești logat.");
+      setSaving(false);
       return;
     }
 
-    setBookingMsg(null);
+    const payload = {
+      id: user.id,
+      full_name: fullName,
+      role: "participant",
+      skills: skills
+        .split(",")
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0),
+      looking_status: lookingStatus,
+      links: {
+        github,
+        linkedin,
+      },
+      phone_number: phone || null,
+      whatsapp_opt_in: whatsappOptIn,
+    };
 
-    // 2. insert în mentoring_bookings
-    const { error: insertError } = await supabase
-      .from("mentoring_bookings")
-      .insert({
-        slot_id: slotId,
-        team_id: teamId,
-        notes: null,
-      });
+    console.log("Onboarding: saving payload =", payload);
 
-    if (insertError) {
-      setBookingMsg("Eroare la booking: " + insertError.message);
+    const { error } = await supabase.from("profiles").upsert(payload);
+
+    if (error) {
+      console.error(error);
+      setErrorMsg("A apărut o eroare la salvare.");
+      setSaving(false);
       return;
     }
 
-    // 3. update slot -> is_booked = true
-    const { error: updateError } = await supabase
-      .from("mentoring_slots")
-      .update({ is_booked: true })
-      .eq("id", slotId);
-
-    if (updateError) {
-      setBookingMsg("Booking creat, dar nu am putut marca slotul ca ocupat.");
-      return;
-    }
-
-    setBookingMsg("Slot rezervat cu succes!");
-
-    // scoatem slotul din listă local
-    setSlots((prev) => prev.filter((s) => s.id !== slotId));
+    router.push("/dashboard");
   };
 
   return (
-    <main className="min-h-screen bg-slate-950 text-slate-100 p-6">
-      <div className="max-w-3xl mx-auto space-y-4">
-        <h1 className="text-2xl font-bold">Mentorat – Alege un slot</h1>
+    <div className="min-h-screen flex justify-center items-center bg-slate-950 text-white">
+      <div className="w-full max-w-lg space-y-4 p-6 border border-slate-800 rounded-lg bg-slate-900">
+        <h1 className="text-2xl font-bold mb-2">Completează profilul</h1>
+        <p className="text-sm text-slate-400 mb-4">
+          Datele tale existente sunt încărcate automat. Modifică ce vrei și
+          apasă „Salvează profilul”.
+        </p>
 
-        {loading && <p>Se încarcă sloturile...</p>}
-        {errorMsg && <p className="text-red-400 text-sm">{errorMsg}</p>}
-        {bookingMsg && (
-          <p className="text-emerald-400 text-sm">{bookingMsg}</p>
+        {loadingProfile && (
+          <p className="text-sm text-slate-400">Se încarcă profilul...</p>
         )}
 
-        {!loading && !errorMsg && slots.length === 0 && (
-          <p className="text-slate-400 text-sm">
-            Nu există sloturi libere momentan.
-          </p>
-        )}
-
-        <div className="space-y-3">
-          {slots.map((slot) => (
-            <div
-              key={slot.id}
-              className="border border-slate-700 rounded p-3 flex items-center justify-between"
-            >
-              <div className="text-sm">
-                <p>
-                  <span className="font-semibold">Start:</span>{" "}
-                  {new Date(slot.start_time).toLocaleString()}
-                </p>
-                <p>
-                  <span className="font-semibold">End:</span>{" "}
-                  {new Date(slot.end_time).toLocaleString()}
-                </p>
-              </div>
-              <button
-                onClick={() => handleBook(slot.id)}
-                className="px-3 py-1 rounded bg-indigo-600 text-white text-sm"
-              >
-                Book
-              </button>
-            </div>
-          ))}
+        <div className="space-y-2">
+          <label className="block text-sm font-medium">Nume complet</label>
+          <input
+            className="border border-slate-700 bg-slate-800 p-2 w-full rounded"
+            value={fullName}
+            onChange={(e) => setFullName(e.target.value)}
+          />
         </div>
+
+        <div className="space-y-2">
+          <label className="block text-sm font-medium">Telefon (WhatsApp)</label>
+          <input
+            className="border border-slate-700 bg-slate-800 p-2 w-full rounded"
+            placeholder="+40712345678"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+          />
+          <p className="text-xs text-slate-400">
+            Folosește format internațional, ex. +40712345678.
+          </p>
+        </div>
+
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={whatsappOptIn}
+            onChange={(e) => setWhatsappOptIn(e.target.checked)}
+          />
+          Vreau să primesc notificări pe WhatsApp (reminder înainte de
+          eveniment).
+        </label>
+
+        <div className="space-y-2">
+          <label className="block text-sm font-medium">
+            Skills (separate prin virgulă)
+          </label>
+          <input
+            className="border border-slate-700 bg-slate-800 p-2 w-full rounded"
+            placeholder="ex: React, Node, UI/UX"
+            value={skills}
+            onChange={(e) => setSkills(e.target.value)}
+          />
+        </div>
+
+        <div className="space-y-2">
+          <label className="block text-sm font-medium">
+            Status (cauți echipă? ai echipă?)
+          </label>
+          <input
+            className="border border-slate-700 bg-slate-800 p-2 w-full rounded"
+            placeholder="ex: Caut echipă AI"
+            value={lookingStatus}
+            onChange={(e) => setLookingStatus(e.target.value)}
+          />
+        </div>
+
+        <div className="space-y-2">
+          <label className="block text-sm font-medium">GitHub</label>
+          <input
+            className="border border-slate-700 bg-slate-800 p-2 w-full rounded"
+            placeholder="https://github.com/..."
+            value={github}
+            onChange={(e) => setGithub(e.target.value)}
+          />
+        </div>
+
+        <div className="space-y-2">
+          <label className="block text-sm font-medium">LinkedIn</label>
+          <input
+            className="border border-slate-700 bg-slate-800 p-2 w-full rounded"
+            placeholder="https://linkedin.com/in/..."
+            value={linkedin}
+            onChange={(e) => setLinkedin(e.target.value)}
+          />
+        </div>
+
+        {errorMsg && <p className="text-sm text-red-400">{errorMsg}</p>}
+
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="w-full p-2 rounded bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-60"
+        >
+          {saving ? "Se salvează..." : "Salvează profilul"}
+        </button>
       </div>
-    </main>
+    </div>
   );
 }

@@ -1,8 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useRouter } from "next/navigation";
+
+type ProfileRow = {
+  id: string;
+  full_name: string | null;
+  role: string | null;
+  skills: string[] | string | null;
+  looking_status: string | null;
+  links: {
+    github?: string | null;
+    linkedin?: string | null;
+  } | null;
+  phone_number: string | null;
+  whatsapp_opt_in: boolean | null;
+};
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -12,19 +26,82 @@ export default function OnboardingPage() {
   const [lookingStatus, setLookingStatus] = useState("");
   const [github, setGithub] = useState("");
   const [linkedin, setLinkedin] = useState("");
-
-  // 👇 noi
   const [phone, setPhone] = useState("");
   const [whatsappOptIn, setWhatsappOptIn] = useState(false);
 
   const [saving, setSaving] = useState(false);
+  const [loadingProfile, setLoadingProfile] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // 1️⃣ Încarcă profilul existent la mount
+  useEffect(() => {
+    const loadProfile = async () => {
+      setLoadingProfile(true);
+      setErrorMsg(null);
+
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+
+      if (userError || !user) {
+        console.log("Onboarding: no user", userError);
+        setErrorMsg("Nu ești logat.");
+        setLoadingProfile(false);
+        return;
+      }
+
+      console.log("Onboarding: current user id =", user.id);
+
+      const { data, error } = await supabase
+        .from("profiles")
+        .select(
+          "id, full_name, role, skills, looking_status, links, phone_number, whatsapp_opt_in"
+        )
+        .eq("id", user.id)
+        .maybeSingle();
+
+      console.log("Onboarding: loaded profile =", { data, error });
+
+      if (error) {
+        // Dacă nu există rând (cod PGRST116) nu e grav, lăsăm câmpurile goale
+        if ((error as any).code !== "PGRST116") {
+          console.error("Supabase profile error:", error);
+          setErrorMsg("Nu am putut încărca profilul.");
+        }
+      } else if (data) {
+        const p = data as ProfileRow;
+
+        setFullName(p.full_name ?? "");
+
+        if (Array.isArray(p.skills)) {
+          setSkills(p.skills.join(", "));
+        } else if (typeof p.skills === "string") {
+          setSkills(p.skills);
+        } else {
+          setSkills("");
+        }
+
+        setLookingStatus(p.looking_status ?? "");
+
+        const links = p.links || {};
+        setGithub(links.github ?? "");
+        setLinkedin(links.linkedin ?? "");
+
+        setPhone(p.phone_number ?? "");
+        setWhatsappOptIn(p.whatsapp_opt_in ?? false);
+      }
+
+      setLoadingProfile(false);
+    };
+
+    loadProfile();
+  }, []);
 
   const handleSave = async () => {
     setSaving(true);
     setErrorMsg(null);
 
-    // Obține user-ul logat
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -34,11 +111,10 @@ export default function OnboardingPage() {
       return;
     }
 
-    // Pregătim payload-ul pentru profil
     const payload = {
       id: user.id,
       full_name: fullName,
-      role: "participant", // setat AUTOMAT
+      role: "participant",
       skills: skills
         .split(",")
         .map((s) => s.trim())
@@ -48,12 +124,12 @@ export default function OnboardingPage() {
         github,
         linkedin,
       },
-      // 👇 câmpurile noi pentru WhatsApp
       phone_number: phone || null,
       whatsapp_opt_in: whatsappOptIn,
     };
 
-    // Salvăm în Supabase
+    console.log("Onboarding: saving payload =", payload);
+
     const { error } = await supabase.from("profiles").upsert(payload);
 
     if (error) {
@@ -63,14 +139,21 @@ export default function OnboardingPage() {
       return;
     }
 
-    // Redirect după salvare
     router.push("/dashboard");
   };
 
   return (
     <div className="min-h-screen flex justify-center items-center bg-slate-950 text-white">
       <div className="w-full max-w-lg space-y-4 p-6 border border-slate-800 rounded-lg bg-slate-900">
-        <h1 className="text-2xl font-bold mb-4">Completează profilul</h1>
+        <h1 className="text-2xl font-bold mb-2">Completează profilul</h1>
+        <p className="text-sm text-slate-400 mb-4">
+          Datele tale existente sunt încărcate automat. Modifică ce vrei și
+          apasă „Salvează profilul”.
+        </p>
+
+        {loadingProfile && (
+          <p className="text-sm text-slate-400">Se încarcă profilul...</p>
+        )}
 
         <div className="space-y-2">
           <label className="block text-sm font-medium">Nume complet</label>
@@ -81,11 +164,8 @@ export default function OnboardingPage() {
           />
         </div>
 
-        {/* Telefon + opt-in WhatsApp */}
         <div className="space-y-2">
-          <label className="block text-sm font-medium">
-            Telefon (WhatsApp)
-          </label>
+          <label className="block text-sm font-medium">Telefon (WhatsApp)</label>
           <input
             className="border border-slate-700 bg-slate-800 p-2 w-full rounded"
             placeholder="+40712345678"
@@ -106,8 +186,6 @@ export default function OnboardingPage() {
           Vreau să primesc notificări pe WhatsApp (reminder înainte de
           eveniment).
         </label>
-
-        {/* Rolul nu mai apare în UI */}
 
         <div className="space-y-2">
           <label className="block text-sm font-medium">
@@ -158,7 +236,7 @@ export default function OnboardingPage() {
         <button
           onClick={handleSave}
           disabled={saving}
-          className="w-full p-2 rounded bg-indigo-600 hover:bg-indigo-700 text-white"
+          className="w-full p-2 rounded bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-60"
         >
           {saving ? "Se salvează..." : "Salvează profilul"}
         </button>
