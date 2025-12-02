@@ -16,8 +16,7 @@ const twilioClient = twilio(
 const WHATSAPP_FROM = process.env.TWILIO_WHATSAPP_FROM!;
 
 const REMINDER_MINUTES = 5; // cu cât timp înainte
-const WINDOW_MINUTES = 1;   // rulăm endpoint-ul la fiecare minut
-
+const WINDOW_MINUTES = 1;   // endpoint-ul e chemat în fiecare minut de cron
 
 export async function GET() {
   const now = new Date();
@@ -25,11 +24,11 @@ export async function GET() {
   const to = new Date(from.getTime() + WINDOW_MINUTES * 60_000);
 
   try {
+    // 1️⃣ Evenimente care încep peste 5–6 minute și nu au reminder trimis
     const { data: events, error: eventsError } = await supabaseAdmin
       .from("events")
-      .select("id, title, start_time, reminder_sent_whatsapp, profile_id")
+      .select("id, title, start_time, reminder_sent_whatsapp")
       .eq("reminder_sent_whatsapp", false)
-      .not("profile_id", "is", null)
       .gte("start_time", from.toISOString())
       .lt("start_time", to.toISOString());
 
@@ -42,72 +41,78 @@ export async function GET() {
       return NextResponse.json({ ok: true, sent: 0, message: "no events in window" });
     }
 
+    // 2️⃣ Toți userii care vor notificări pe WhatsApp și au telefon
+    const { data: profiles, error: profilesError } = await supabaseAdmin
+      .from("profiles")
+      .select("id, full_name, phone_number, whatsapp_opt_in")
+      .eq("whatsapp_opt_in", true)
+      .not("phone_number", "is", null);
+
+    if (profilesError) {
+      console.error("Supabase profiles error:", profilesError);
+      return NextResponse.json({ error: profilesError.message }, { status: 500 });
+    }
+
+    if (!profiles || profiles.length === 0) {
+      // nimeni nu e înscris -> doar ieșim, dar marcăm totuși ca ne-trimis?
+      // eu prefer să nu marcăm eventele, ca să fie trimise când apar useri noi
+      return NextResponse.json({ ok: true, sent: 0, message: "no subscribed profiles" });
+    }
+
     let sentCount = 0;
 
+    // 3️⃣ Pentru fiecare eveniment, trimitem la TOȚI userii abonați
     for (const ev of events as any[]) {
-      const { data: profiles, error: profileError } = await supabaseAdmin
-        .from("profiles")
-        .select("id, full_name, phone_number, whatsapp_opt_in")
-        .eq("id", ev.profile_id);
-
-      if (profileError) {
-        console.error("Supabase profiles error:", profileError);
-        continue;
-      }
-
-      const profile = profiles && profiles[0];
-      if (!profile) continue;
-      if (!profile.phone_number) continue;
-      if (profile.whatsapp_opt_in === false) continue;
-
-      const toWhatsApp = `whatsapp:${profile.phone_number}`;
       const start = new Date(ev.start_time);
       const ora = start.toLocaleTimeString("ro-RO", {
         hour: "2-digit",
         minute: "2-digit",
       });
 
-      const body = `Salut${
-        profile.full_name ? " " + profile.full_name : ""
-      }! 👋 Evenimentul "${ev.title}" începe la ${ora} (în ~${REMINDER_MINUTES} minute).`;
+      for (const profile of profiles as any[]) {
+        const toWhatsApp = `whatsapp:${profile.phone_number}`;
 
-      try {
-        const msg = await twilioClient.messages.create({
-          from: WHATSAPP_FROM,
-          to: toWhatsApp,
-          body,
-        });
+        const body = `Salut${
+          profile.full_name ? " " + profile.full_name : ""
+        }! 👋 Evenimentul "${ev.title}" începe la ${ora} (în ~${REMINDER_MINUTES} minute).`;
 
-        // log în tabelul notifications
-        await supabaseAdmin.from("notifications").insert({
-          event_id: ev.id,
-          profile_id: profile.id,
-          channel: "whatsapp",
-          message: body,
-          status: msg.status ?? "queued",
-          error_code: msg.errorCode ? String(msg.errorCode) : null,
-        });
+        try {
+          const msg = await twilioClient.messages.create({
+            from: WHATSAPP_FROM,
+            to: toWhatsApp,
+            body,
+          });
 
-        // marcăm eventul ca notificat
-        await supabaseAdmin
-          .from("events")
-          .update({ reminder_sent_whatsapp: true })
-          .eq("id", ev.id);
+          sentCount++;
 
-        sentCount++;
-      } catch (err: any) {
-        console.error("Twilio error pentru event", ev.id, err);
+          // Dacă ai tabela notifications, poți loga aici:
+          // await supabaseAdmin.from("notifications").insert({
+          //   event_id: ev.id,
+          //   profile_id: profile.id,
+          //   channel: "whatsapp",
+          //   message: body,
+          //   status: msg.status ?? "queued",
+          //   error_code: msg.errorCode ? String(msg.errorCode) : null,
+          // });
+        } catch (err) {
+          console.error(
+            "Twilio error pentru event",
+            ev.id,
+            "profil",
+            profile.id,
+            err
+          );
 
-        // log și erorile, să le vezi în notifications
-        await supabaseAdmin.from("notifications").insert({
-          event_id: ev.id,
-          profile_id: profile.id,
-          channel: "whatsapp",
-          message: body,
-          status: "error",
-          error_code: err?.code ? String(err.code) : err?.message ?? null,
-        });
+          // și aici poți loga eroarea în notifications dacă vrei
+        }
       }
+
+      // 4️⃣ după ce am trimis la TOȚI userii pentru eventul ăsta,
+      // îl marcăm ca "reminder trimis"
+      await supabaseAdmin
+        .from("events")
+        .update({ reminder_sent_whatsapp: true })
+        .eq("id", ev.id);
     }
 
     return NextResponse.json({ ok: true, sent: sentCount });
@@ -119,4 +124,3 @@ export async function GET() {
     );
   }
 }
-
