@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
-import { useRouter } from "next/navigation";
 
 type Team = {
   id: string;
@@ -24,19 +24,33 @@ type Profile = {
     | null;
 };
 
-type Props = {
-  params: { team_id: string };
-};
+// helper: normalizează skills în array de string-uri
+function normalizeSkills(skills: string[] | string | null): string[] {
+  if (!skills) return [];
+  if (Array.isArray(skills)) return skills.filter(Boolean);
+  return skills
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+}
 
-export default function RecruitPage({ params }: Props) {
+export default function RecruitPage() {
   const router = useRouter();
+  const params = useParams<{ team_id: string }>();
+  const teamId = params?.team_id as string | undefined;
+
   const [team, setTeam] = useState<Team | null>(null);
   const [candidates, setCandidates] = useState<Profile[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-    useEffect(() => {
+  useEffect(() => {
+    if (!teamId) {
+      // dacă pentru orice motiv nu avem încă teamId, nu rulăm nimic
+      return;
+    }
+
     const loadData = async () => {
       setLoading(true);
       setErrorMsg(null);
@@ -57,15 +71,16 @@ export default function RecruitPage({ params }: Props) {
       const { data: teamData, error: teamErr } = await supabase
         .from("teams")
         .select("id, name, creator_id")
-        .eq("id", params.team_id)
+        .eq("id", teamId)
         .maybeSingle();
 
       console.log("Recruit: team query result =", { teamData, teamErr });
 
-      // dacă e eroare „fără rânduri” (PGRST116), o tratăm separat
       if (teamErr && (teamErr as any).code !== "PGRST116") {
         console.error("Recruit: teamErr", teamErr);
-        setErrorMsg(teamErr.message || "Nu am putut încărca detaliile echipei.");
+        setErrorMsg(
+          teamErr.message || "Nu am putut încărca detaliile echipei."
+        );
         setLoading(false);
         return;
       }
@@ -110,9 +125,7 @@ export default function RecruitPage({ params }: Props) {
       // 3) luăm toate profilurile și filtrăm pe client
       const { data: profilesData, error: profilesErr } = await supabase
         .from("profiles")
-        .select(
-          "id, full_name, role, skills, looking_status, links"
-        );
+        .select("id, full_name, role, skills, looking_status, links");
 
       if (profilesErr) {
         console.error("Recruit: profilesErr", profilesErr);
@@ -134,10 +147,9 @@ export default function RecruitPage({ params }: Props) {
     };
 
     loadData();
-  }, [params.team_id]);
+  }, [teamId]);
 
-
-  // filtrare după search (nume + skilluri)
+  // filtrare după search (nume + skilluri + status)
   const filtered = useMemo(() => {
     if (!search.trim()) return candidates;
 
@@ -147,11 +159,12 @@ export default function RecruitPage({ params }: Props) {
       const name = (p.full_name || "").toLowerCase();
       const skillsArray = normalizeSkills(p.skills);
       const skillsText = skillsArray.join(" ").toLowerCase();
+      const status = (p.looking_status || "").toLowerCase();
 
       return (
         name.includes(q) ||
         skillsText.includes(q) ||
-        (p.looking_status || "").toLowerCase().includes(q)
+        status.includes(q)
       );
     });
   }, [candidates, search]);
@@ -163,14 +176,14 @@ export default function RecruitPage({ params }: Props) {
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-purple-500/20 via-slate-950 to-slate-950" />
         <div className="relative mx-auto max-w-5xl px-4 py-10 space-y-3">
           <p className="text-xs uppercase tracking-[0.2em] text-purple-200/80">
-            Team recruiting
+            TEAM RECRUITING
           </p>
           <h1 className="text-2xl md:text-3xl font-bold">
             Caută membri pentru echipa ta
           </h1>
           <p className="text-sm text-slate-300 max-w-xl">
-            Vezi participanții care nu sunt încă într-o echipă și filtrează-i
-            după skill-uri sau status. Poți folosi GitHub / LinkedIn pentru a-i
+            Vezi participanții care nu sunt încă într-o echipă și filtrează-i 
+            după skill-uri sau status. Poți folosi GitHub / LinkedIn pentru a-i 
             contacta.
           </p>
           {team && (
@@ -286,30 +299,20 @@ export default function RecruitPage({ params }: Props) {
                 );
               })}
 
-              {!loading && !errorMsg && candidates.length > 0 && filtered.length === 0 && (
-                <p className="text-sm text-slate-400 col-span-full">
-                  Niciun participant nu corespunde filtrului curent. Încearcă
-                  alte cuvinte cheie (ex: &quot;React&quot;, &quot;backend&quot;,
-                  &quot;design&quot;...).
-                </p>
-              )}
+              {!loading &&
+                !errorMsg &&
+                candidates.length > 0 &&
+                filtered.length === 0 && (
+                  <p className="text-sm text-slate-400 col-span-full">
+                    Niciun participant nu corespunde filtrului curent. Încearcă
+                    alte cuvinte cheie (ex: &quot;React&quot;, &quot;backend&quot;,
+                    &quot;design&quot;...).
+                  </p>
+                )}
             </div>
           </>
         )}
       </section>
     </main>
   );
-}
-
-// helper: normalizează skills în array de string-uri
-function normalizeSkills(
-  skills: string[] | string | null
-): string[] {
-  if (!skills) return [];
-  if (Array.isArray(skills)) return skills.filter(Boolean);
-  // e un string gen "React, Node, UI/UX"
-  return skills
-    .split(",")
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0);
 }
