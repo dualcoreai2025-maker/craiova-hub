@@ -11,75 +11,71 @@ type Profile = {
   role: string | null;
 };
 
-// link-uri pentru toți userii
-const quickLinks = [
+// link-uri pentru toți userii (participant / mentor / etc.)
+const userLinks = [
   {
     href: "/schedule",
     label: "Program & evenimente",
-    description: "Timeline complet pentru toate zilele de hackathon.",
+    description: "Vezi toate sesiunile, workshop-urile și programul complet.",
     icon: "🗓️",
-    badge: "Important azi",
   },
   {
     href: "/teams",
-    label: "Echipa ta",
-    description: "Vezi echipa în care ești, rolurile și invitațiile.",
+    label: "Echipe",
+    description: "Vezi și gestionează echipele din care faci parte.",
     icon: "👥",
-    badge: "Colaborare",
   },
   {
     href: "/resources",
     label: "Resurse & materiale",
-    description: "Tutoriale, ghiduri, repo-uri și alte materiale utile.",
+    description: "Access la materiale, link-uri utile și guidelines.",
     icon: "📚",
-    badge: "Knowledge",
   },
   {
     href: "/leaderboard",
     label: "Leaderboard",
-    description: "Clasamentul echipelor după punctaj.",
+    description: "Vezi punctajele echipelor și progresul lor.",
     icon: "🏆",
-    badge: "Live",
   },
   {
     href: "/onboarding",
     label: "Profil & notificări",
-    description: "Actualizează-ți datele și reminder-ele WhatsApp.",
+    description:
+      "Actualizează-ți numele, telefonul WhatsApp și preferințele de notificare.",
     icon: "🧾",
-    badge: "Profil",
   },
 ];
 
-// link-uri pentru admin
+// link-uri pentru admin (doar rol admin le vede)
 const adminLinks = [
   {
     href: "/admin/events",
-    label: "Evenimente",
-    description: "Creează și ajustează programul hackathon-ului.",
+    label: "Admin – Evenimente",
+    description: "Adaugă, editează și șterge evenimentele din program.",
     icon: "🛠️",
   },
   {
     href: "/admin/projects",
-    label: "Proiecte",
-    description: "Vezi livrabilele echipelor și statusul lor.",
+    label: "Admin – Proiecte",
+    description: "Vezi și administrează proiectele echipelor.",
     icon: "📁",
   },
   {
     href: "/admin/points",
-    label: "Puncte & scoring",
-    description: "Atribuie puncte, actualizează leaderboard-ul.",
+    label: "Admin – Puncte",
+    description: "Gestionează sistemul de punctaj și leaderboard-ul.",
     icon: "⭐",
   },
   {
     href: "/admin/resources",
-    label: "Resurse",
-    description: "Adaugă materiale noi pentru participanți.",
+    label: "Admin – Resurse",
+    description: "Adaugă materiale și link-uri în secțiunea de resurse.",
     icon: "📚",
   },
   {
     href: "/admin/users",
-    label: "Utilizatori",
-    description: "Gestionează profiluri, roluri și acces.",
+    label: "Admin – Utilizatori",
+    description: "Gestionează profilurile și rolurile utilizatorilor.",
     icon: "👤",
   },
 ];
@@ -128,81 +124,70 @@ export default function DashboardPage() {
 
   return (
     <main className="min-h-screen bg-slate-950 text-slate-50">
-      {/* Glow global */}
-      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.16),_transparent_55%),radial-gradient(circle_at_bottom,_rgba(52,211,153,0.18),_transparent_55%)]" />
+      {/* glow de fundal, foarte subtil */}
+      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.18),_transparent_55%),radial-gradient(circle_at_bottom,_rgba(16,185,129,0.2),_transparent_55%)]" />
 
-      <motion.div
-        className="relative mx-auto max-w-6xl px-4 pb-16 pt-8 md:pt-10"
-        initial={{ opacity: 0, y: 24 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.45, ease: "easeOut" }}
-      >
-        {/* HEADER */}
-        <header className="mb-8 flex flex-col gap-4 border-b border-slate-800 pb-6 md:flex-row md:items-center md:justify-between">
-          <div className="space-y-2">
-            <p className="text-xs uppercase tracking-[0.25em] text-indigo-300/80">
-              craiova hackathon · dashboard
-            </p>
-            <h1 className="text-2xl font-semibold sm:text-3xl md:text-4xl">
-              Salut
-              {profile?.full_name ? `, ${profile.full_name}` : ""}! 👋
-            </h1>
-            <p className="max-w-xl text-sm text-slate-300">
-              De aici coordonezi tot: program, echipă, proiect și resurse.
-              Începe cu cele mai importante acțiuni pentru următoarele ore.
-            </p>
-          </div>
+      {/* CONȚINUT */}
+      <div className="relative mx-auto max-w-6xl px-4 pb-16 pt-10 space-y-10">
+        {/* HERO + CARD PROFIL */}
+        <section className="relative overflow-hidden rounded-3xl border border-slate-800/70 bg-slate-950/80 shadow-[0_24px_80px_rgba(15,23,42,0.9)]">
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-emerald-500/15 via-slate-900/40 to-indigo-500/20" />
 
-          <div className="flex flex-col items-start gap-2 md:items-end">
-            <div className="inline-flex items-center gap-2 rounded-full border border-slate-700 bg-slate-900/80 px-3 py-1 text-[11px] text-slate-200">
-              <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span>
-                Status:{" "}
-                <span className="font-semibold text-emerald-300">
-                  conectat
-                </span>
-              </span>
-            </div>
-            <p className="text-[11px] text-slate-500">
-              Nu uita să îți verifici{" "}
-              <Link
-                href="/schedule"
-                className="text-sky-400 hover:text-sky-300"
-              >
-                programul
-              </Link>{" "}
-              și{" "}
-              <Link
-                href="/teams"
-                className="text-sky-400 hover:text-sky-300"
-              >
-                echipa
-              </Link>
-              .
-            </p>
-          </div>
-        </header>
-
-        {/* GRID PRINCIPAL */}
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,2.2fr)_minmax(0,1.2fr)]">
-          {/* COL STÂNGA */}
-          <div className="space-y-6">
-            {/* CARD PROFIL + TODAY */}
-            <motion.section
-              className="grid gap-4 md:grid-cols-2"
+          <div className="relative flex flex-col gap-8 px-6 py-8 md:flex-row md:items-center md:px-8 md:py-10">
+            {/* text stânga */}
+            <motion.div
+              className="flex-1 space-y-4"
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1, duration: 0.4 }}
+              transition={{ duration: 0.4, ease: "easeOut" }}
             >
-              <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4 shadow-md shadow-slate-950/60">
-                <h2 className="mb-2 text-sm font-semibold text-slate-100">
-                  Profilul tău
-                </h2>
+              <span className="inline-flex items-center rounded-full border border-emerald-400/40 bg-emerald-500/10 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.23em] text-emerald-300">
+                Dashboard · Craiova Hackathon
+              </span>
+
+              <h1 className="text-3xl font-bold leading-tight sm:text-4xl md:text-5xl">
+                Salut
+                {profile?.full_name ? `, ${profile.full_name}` : ""}! 👋
+                <br />
+                Hub-ul tău pentru{" "}
+                <span className="bg-gradient-to-r from-emerald-300 via-sky-300 to-indigo-300 bg-clip-text text-transparent">
+                  tot hackathon-ul.
+                </span>
+              </h1>
+
+              <p className="max-w-xl text-sm text-slate-200/90 md:text-base">
+                De aici accesezi programul, echipa, resursele și leaderboard-ul.
+                Totul într-un singur loc, cu notificări automate pe WhatsApp.
+              </p>
+
+              <div className="flex flex-wrap gap-2 text-xs text-slate-200 md:text-sm">
+                <Chip>💻 48h de coding & colaborare</Chip>
+                <Chip>🏆 Premii & mentorship</Chip>
+                {isAdmin && <Chip variant="admin">🛠️ Mod admin activ</Chip>}
+              </div>
+            </motion.div>
+
+            {/* card profil dreapta */}
+            <motion.div
+              className="flex-1"
+              initial={{ opacity: 0, x: 16 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.1, duration: 0.4, ease: "easeOut" }}
+            >
+              <div className="mx-auto max-w-md rounded-2xl border border-slate-800 bg-slate-950/90 p-4 shadow-lg shadow-emerald-500/25 backdrop-blur">
+                <div className="mb-3 flex items-center justify-between text-[11px] text-slate-400">
+                  <span>Starea contului</span>
+                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-300">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    notificări WhatsApp
+                  </span>
+                </div>
+
                 {loading ? (
                   <div className="space-y-2">
                     <SkeletonLine />
-                    <SkeletonLine width="80%" />
-                    <SkeletonLine width="60%" />
+                    <SkeletonLine width="70%" />
+                    <SkeletonLine width="50%" />
                   </div>
                 ) : errorMsg ? (
                   <p className="text-sm text-red-400">{errorMsg}</p>
@@ -220,15 +205,15 @@ export default function DashboardPage() {
                         {profile.role || "participant"}
                       </span>
                     </p>
-                    <p className="text-xs text-slate-500">
-                      Poți actualiza telefonul și preferințele de notificare
-                      din pagina de profil.
+                    <p className="text-xs text-slate-400">
+                      Poți actualiza telefonul și preferințele de notificare din
+                      pagina de profil.
                     </p>
                     <Link
                       href="/onboarding"
                       className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-300 hover:text-emerald-200"
                     >
-                      → Editează profilul
+                      → Actualizează profilul
                     </Link>
                   </div>
                 ) : (
@@ -237,162 +222,128 @@ export default function DashboardPage() {
                   </p>
                 )}
               </div>
-
-              <div className="rounded-2xl border border-slate-800 bg-gradient-to-br from-slate-900 via-slate-900 to-slate-900/60 p-4 shadow-md shadow-slate-950/60">
-                <div className="mb-2 flex items-center justify-between">
-                  <h2 className="text-sm font-semibold text-slate-100">
-                    Următorul pas
-                  </h2>
-                  <span className="rounded-full bg-slate-800 px-2 py-0.5 text-[10px] text-slate-300">
-                    recomandat
-                  </span>
-                </div>
-                <p className="text-sm text-slate-300">
-                  Verifică programul de azi și asigură-te că echipa ta este
-                  configurată corect înainte de următoarea sesiune.
-                </p>
-                <div className="mt-3 flex flex-wrap gap-2 text-xs">
-                  <LinkChip href="/schedule">🗓️ Vezi programul</LinkChip>
-                  <LinkChip href="/teams">👥 Echipă & invitații</LinkChip>
-                  <LinkChip href="/resources">📚 Ghiduri utile</LinkChip>
-                </div>
-              </div>
-            </motion.section>
-
-            {/* QUICK ACTIONS */}
-            <motion.section
-              initial={{ opacity: 0, y: 18 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.18, duration: 0.45 }}
-            >
-              <div className="mb-3 flex items-center justify-between">
-                <h2 className="text-sm font-semibold text-slate-100">
-                  Quick actions
-                </h2>
-                <p className="text-[11px] text-slate-500">
-                  Navighează rapid în zonele pe care le folosești cel mai des.
-                </p>
-              </div>
-
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {quickLinks.map((link, idx) => (
-                  <motion.div
-                    key={link.href}
-                    initial={{ opacity: 0, y: 12 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{
-                      delay: 0.22 + idx * 0.04,
-                      duration: 0.35,
-                    }}
-                  >
-                    <Link
-                      href={link.href}
-                      className="group flex h-full flex-col justify-between rounded-xl border border-slate-800 bg-slate-900/80 p-4 text-sm shadow-sm shadow-slate-950/40 transition hover:-translate-y-1 hover:border-emerald-400/70 hover:bg-slate-900"
-                    >
-                      <div className="mb-3 flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xl">{link.icon}</span>
-                          <h3 className="font-semibold">{link.label}</h3>
-                        </div>
-                        <span className="rounded-full bg-slate-800 px-2 py-0.5 text-[10px] text-slate-300">
-                          {link.badge}
-                        </span>
-                      </div>
-                      <p className="mb-3 text-xs text-slate-400">
-                        {link.description}
-                      </p>
-                      <span className="mt-auto inline-flex items-center text-xs font-semibold text-emerald-300 group-hover:text-emerald-200">
-                        Deschide
-                        <span className="ml-1 transition-transform group-hover:translate-x-0.5">
-                          ↗
-                        </span>
-                      </span>
-                    </Link>
-                  </motion.div>
-                ))}
-              </div>
-            </motion.section>
+            </motion.div>
           </div>
+        </section>
 
-          {/* COL DREAPTA: SIDEBAR SUMMARY */}
-          <motion.aside
-            className="space-y-4"
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.15, duration: 0.4 }}
+        {/* ZONA PARTICIPANT */}
+        <section className="space-y-4">
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35 }}
           >
-            {/* Card status */}
-            <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4 shadow-md shadow-slate-950/60">
-              <h2 className="mb-2 text-sm font-semibold text-slate-100">
-                Rezumat rapid
-              </h2>
-              <ul className="space-y-1.5 text-xs text-slate-300">
-                <li>• Notificări WhatsApp active pentru evenimente.</li>
-                <li>• Programul este actualizat automat din Supabase.</li>
-                <li>• Echipele sunt sincronizate cu leaderboard-ul.</li>
-              </ul>
-            </div>
+            <h2 className="text-lg font-semibold">Zona ta de participant</h2>
+            <p className="text-sm text-slate-400 max-w-2xl">
+              Alege unde vrei să mergi: vezi programul, lucrează cu echipa,
+              verifică leaderboard-ul sau accesează resursele și notificările.
+            </p>
+          </motion.div>
 
-            {/* Card „Stay on track” */}
-            <div className="rounded-2xl border border-slate-800 bg-gradient-to-br from-slate-900 via-slate-900 to-slate-900/40 p-4">
-              <h2 className="mb-2 text-sm font-semibold text-slate-100">
-                Stay on track
-              </h2>
-              <p className="text-xs text-slate-300">
-                Încearcă să verifici leaderboard-ul după fiecare milestone și
-                ține-ți echipa la curent cu modificările din program.
-              </p>
-              <div className="mt-3 flex gap-2 text-[11px]">
-                <LinkChip href="/leaderboard">🏆 Deschide leaderboard</LinkChip>
-                <LinkChip href="/schedule">🕒 Timeline complet</LinkChip>
-              </div>
-            </div>
-
-            {/* Admin zone */}
-            {isAdmin && (
-              <div className="rounded-2xl border border-emerald-500/50 bg-emerald-500/5 p-4 shadow-[0_0_25px_rgba(16,185,129,0.25)]">
-                <div className="mb-2 flex items-center justify-between">
-                  <h2 className="text-sm font-semibold text-emerald-100">
-                    Zona de admin
-                  </h2>
-                  <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-semibold text-emerald-200">
-                    doar pentru tine
+          <motion.div
+            className="grid gap-4 md:grid-cols-2 lg:grid-cols-3"
+            initial="hidden"
+            animate="show"
+            variants={{
+              hidden: { opacity: 0, y: 10 },
+              show: {
+                opacity: 1,
+                y: 0,
+                transition: { staggerChildren: 0.06 },
+              },
+            }}
+          >
+            {userLinks.map((link) => (
+              <motion.div
+                key={link.href}
+                variants={{ hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0 } }}
+              >
+                <Link
+                  href={link.href}
+                  className="group flex h-full flex-col justify-between rounded-xl border border-slate-800 bg-slate-900/80 p-4 text-sm shadow-sm shadow-slate-950/40 transition hover:-translate-y-1 hover:border-emerald-400/70 hover:bg-slate-900"
+                >
+                  <div className="mb-3 flex items-center gap-2">
+                    <span className="text-xl">{link.icon}</span>
+                    <h3 className="font-semibold">{link.label}</h3>
+                  </div>
+                  <p className="mb-3 text-xs text-slate-400">
+                    {link.description}
+                  </p>
+                  <span className="mt-auto inline-flex items-center text-xs font-semibold text-emerald-300 group-hover:text-emerald-200">
+                    Deschide
+                    <span className="ml-1 transition-transform group-hover:translate-x-0.5">
+                      ↗
+                    </span>
                   </span>
-                </div>
-                <p className="mb-3 text-xs text-emerald-100/80">
-                  Administrează programul, proiectele și punctele. Aceste
-                  acțiuni afectează toți participanții.
-                </p>
+                </Link>
+              </motion.div>
+            ))}
+          </motion.div>
+        </section>
 
-                <div className="grid gap-2 text-xs">
-                  {adminLinks.map((link) => (
-                    <Link
-                      key={link.href}
-                      href={link.href}
-                      className="group flex items-center justify-between rounded-lg border border-emerald-500/40 bg-emerald-500/5 px-3 py-2 transition hover:bg-emerald-500/15"
-                    >
-                      <div className="flex items-center gap-2">
-                        <span>{link.icon}</span>
-                        <div>
-                          <p className="font-semibold text-emerald-50">
-                            {link.label}
-                          </p>
-                          <p className="text-[10px] text-emerald-100/80">
-                            {link.description}
-                          </p>
-                        </div>
-                      </div>
-                      <span className="text-[10px] text-emerald-200 group-hover:translate-x-0.5 transition-transform">
+        {/* ZONA ADMIN – doar pentru admini */}
+        {isAdmin && (
+          <section className="space-y-4">
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.35 }}
+            >
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-semibold">Zona de administrare</h2>
+                <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-300">
+                  doar pentru admini
+                </span>
+              </div>
+              <p className="max-w-2xl text-sm text-slate-400">
+                De aici gestionezi programul, proiectele, punctajele, resursele
+                și utilizatorii. Acțiunile făcute aici afectează toți
+                participanții.
+              </p>
+            </motion.div>
+
+            <motion.div
+              className="grid gap-4 md:grid-cols-2 lg:grid-cols-3"
+              initial="hidden"
+              animate="show"
+              variants={{
+                hidden: { opacity: 0, y: 10 },
+                show: {
+                  opacity: 1,
+                  y: 0,
+                  transition: { staggerChildren: 0.06 },
+                },
+              }}
+            >
+              {adminLinks.map((link) => (
+                <motion.div
+                  key={link.href}
+                  variants={{ hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0 } }}
+                >
+                  <Link
+                    href={link.href}
+                    className="group flex h-full flex-col justify-between rounded-xl border border-emerald-500/40 bg-emerald-900/20 p-4 text-sm shadow-sm shadow-emerald-900/40 transition hover:-translate-y-1 hover:border-emerald-400/80 hover:bg-emerald-900/30"
+                  >
+                    <div className="mb-3 flex items-center gap-2">
+                      <span className="text-xl">{link.icon}</span>
+                      <h3 className="font-semibold">{link.label}</h3>
+                    </div>
+                    <p className="mb-3 text-xs text-emerald-50/80">
+                      {link.description}
+                    </p>
+                    <span className="mt-auto inline-flex items-center text-xs font-semibold text-emerald-200 group-hover:text-emerald-100">
+                      Intră în panou
+                      <span className="ml-1 transition-transform group-hover:translate-x-0.5">
                         ↗
                       </span>
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            )}
-          </motion.aside>
-        </div>
-      </motion.div>
+                    </span>
+                  </Link>
+                </motion.div>
+              ))}
+            </motion.div>
+          </section>
+        )}
+      </div>
     </main>
   );
 }
@@ -414,23 +365,6 @@ function Chip({
       : "border-slate-700 bg-slate-900/80 text-slate-200";
 
   return <span className={`${base} ${styles}`}>{children}</span>;
-}
-
-function LinkChip({
-  href,
-  children,
-}: {
-  href: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <Link
-      href={href}
-      className="inline-flex items-center gap-1 rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-[11px] text-slate-200 hover:border-emerald-400/70 hover:text-emerald-200"
-    >
-      {children}
-    </Link>
-  );
 }
 
 function SkeletonLine({ width = "100%" }: { width?: string }) {
