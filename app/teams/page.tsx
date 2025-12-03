@@ -154,20 +154,8 @@ export default function TeamsPage() {
                   >
                     📁 Proiectul echipei
                   </Link>
-                  <Link
-                    href={`/teams/${team.id}/mentoring`}
-                    className="inline-flex items-center gap-1 rounded-lg border border-slate-700 bg-slate-900 px-3 py-1.5 font-semibold text-slate-100 hover:border-sky-400 hover:text-sky-200"
-                  >
-                    🧠 Mentorat
-                  </Link>
-                  {isCreator && (
-                    <Link
-                      href={`/teams/${team.id}/project`}
-                      className="inline-flex items-center gap-1 rounded-lg bg-emerald-500 px-3 py-1.5 font-semibold text-slate-950 hover:bg-emerald-400"
-                    >
-                      ✏️ Editează proiectul
-                    </Link>
-                  )}
+                  
+                
                 </div>
               </div>
 

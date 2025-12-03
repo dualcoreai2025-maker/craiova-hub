@@ -110,12 +110,13 @@ export default function NewTeamPage() {
       .select("id")
        .single<{ id: string }>();
 
-    if (error) {
-      console.error(error);
-      setErrorMsg("Nu am putut crea echipa. Verifică dacă nu ai deja una.");
-      setLoading(false);
-      return;
-    }
+     if (error) {
+  console.error(error);
+  setErrorMsg("Nu am putut crea echipa. Verifică dacă nu ai deja una.");
+  setLoading(false);
+  return;
+}
+
 
     // 2) îl adăugăm pe creator în team_members
     const { error: memberError } = await supabase.from("team_members").insert({
