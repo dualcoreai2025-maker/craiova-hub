@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabaseClient';
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabaseClient";
 
 export default function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -14,7 +14,7 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
 
       // dacă nu avem sesiune → trimite la /login
       if (!data.session) {
-        router.push('/login');
+        router.push("/login");
       } else {
         setChecking(false);
       }
