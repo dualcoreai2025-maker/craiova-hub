@@ -215,6 +215,30 @@ export default function TeamsPage() {
     setInvites((prev) => prev.filter((inv) => inv.id !== inviteId));
   };
 
+  // Ownerul scoate un membru din echipă
+  const handleRemoveMember = async (profileId: string) => {
+    if (!team || !isCreator) return;
+    if (!confirm("Sigur vrei să scoți acest membru din echipă?")) return;
+
+    setErrorMsg(null);
+
+    const { error } = await supabase
+      .from("team_members")
+      .delete()
+      .eq("team_id", team.id)
+      .eq("profile_id", profileId);
+
+    if (error) {
+      console.error(error);
+      setErrorMsg(
+        error.message || "Nu am putut scoate membrul din echipă."
+      );
+      return;
+    }
+
+    setMembers((prev) => prev.filter((m) => m.profile_id !== profileId));
+  };
+
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100">
       {/* HERO */}
@@ -265,7 +289,9 @@ export default function TeamsPage() {
                   </div>
                   <div className="flex gap-2 text-xs">
                     <button
-                      onClick={() => handleAcceptInvite(inv.id, inv.team_id)}
+                      onClick={() =>
+                        handleAcceptInvite(inv.id, inv.team_id)
+                      }
                       className="rounded-lg bg-emerald-500 px-3 py-1.5 font-semibold text-slate-950 hover:bg-emerald-400"
                     >
                       Acceptă
@@ -304,7 +330,7 @@ export default function TeamsPage() {
         {/* Card echipă + membri */}
         {!loading && !errorMsg && team && (
           <>
-            {/* Card echipă - neschimbat față de ce aveam */}
+            {/* Card echipă */}
             <div className="space-y-5 rounded-2xl border border-slate-800 bg-slate-900/80 p-5 shadow-sm shadow-slate-900/50">
               <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                 <div className="space-y-1">
@@ -388,6 +414,11 @@ export default function TeamsPage() {
                 <div className="flex flex-col gap-2">
                   {members.map((m) => {
                     const skillsArr = normalizeSkills(m.skills);
+                    const isOwnerMember =
+                      team && m.profile_id === team.creator_id;
+                    const roleLabel = isOwnerMember
+                      ? "owner"
+                      : m.role || "member";
 
                     return (
                       <div
@@ -416,9 +447,24 @@ export default function TeamsPage() {
                             </div>
                           )}
                         </div>
-                        <span className="inline-flex items-center rounded-full border border-slate-700 bg-slate-800 px-2 py-0.5 text-[11px] font-semibold text-slate-200">
-                          {m.role || "member"}
-                        </span>
+
+                        <div className="flex flex-col items-end gap-2">
+                          <span className="inline-flex items-center rounded-full border border-slate-700 bg-slate-800 px-2 py-0.5 text-[11px] font-semibold text-slate-200">
+                            {roleLabel}
+                          </span>
+
+                          {/* Ownerul poate da afară doar alți membri, nu pe el însuși */}
+                          {isCreator && !isOwnerMember && (
+                            <button
+                              onClick={() =>
+                                handleRemoveMember(m.profile_id)
+                              }
+                              className="text-[11px] rounded-md border border-red-500/60 px-2 py-1 text-red-200 hover:bg-red-500/15"
+                            >
+                              Scoate din echipă
+                            </button>
+                          )}
+                        </div>
                       </div>
                     );
                   })}
