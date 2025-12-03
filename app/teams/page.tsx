@@ -149,13 +149,22 @@ export default function TeamsPage() {
 
                 <div className="flex flex-wrap gap-2 text-xs">
                   {isCreator && (
-                    <Link
-                      href={`/teams/${team.id}/project`}
-                      className="inline-flex items-center gap-1 rounded-lg bg-emerald-500 px-3 py-1.5 font-semibold text-slate-950 hover:bg-emerald-400"
-                    >
-                      ✏️ Editează proiectul
-                    </Link>
-                  )}
+    <>
+      <Link
+        href={`/teams/${team.id}/recruit`}
+        className="inline-flex items-center gap-1 rounded-lg border border-purple-400/70 bg-purple-500/15 px-3 py-1.5 font-semibold text-purple-100 hover:bg-purple-500/25"
+      >
+        🔍 Caută membri
+      </Link>
+
+      <Link
+        href={`/teams/${team.id}/project`}
+        className="inline-flex items-center gap-1 rounded-lg bg-emerald-500 px-3 py-1.5 font-semibold text-slate-950 hover:bg-emerald-400"
+      >
+        ✏️ Editează proiectul
+      </Link>
+    </>
+  )}
                   
                 
                 </div>
