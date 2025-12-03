@@ -171,7 +171,7 @@ export default function OnboardingPage() {
             <div className="flex flex-wrap gap-3 text-xs text-slate-300">
               <div className="inline-flex items-center gap-2 rounded-full border border-slate-700 bg-slate-900/70 px-3 py-1">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-                Profil folosit la echipe & matche-uri
+                Profil folosit la echipe & match-uri
               </div>
               <div className="inline-flex items-center gap-2 rounded-full border border-slate-700 bg-slate-900/70 px-3 py-1">
                 <span className="h-1.5 w-1.5 rounded-full bg-sky-400" />
