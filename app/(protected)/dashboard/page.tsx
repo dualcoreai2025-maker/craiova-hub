@@ -25,18 +25,6 @@ const userLinks = [
     icon: "👥",
   },
   {
-    href: "/teams/new",
-    label: "Creează echipă",
-    description: "Pornește o echipă nouă și invită-ți colegii.",
-    icon: "➕",
-  },
-  {
-    href: "/mentor-slots",
-    label: "Mentorat",
-    description: "Rezervă sloturi de mentoring și vezi disponibilitatea.",
-    icon: "🧠",
-  },
-  {
     href: "/resources",
     label: "Resurse & materiale",
     description: "Access la materiale, link-uri utile și guidelines.",
