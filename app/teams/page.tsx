@@ -5,12 +5,13 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 
 type Team = {
-  id: number;
+  id: string; // uuid
   name: string;
   track: string | null;
   description: string | null;
   creator_id: string | null;
 };
+
 
 export default function TeamsPage() {
   const [team, setTeam] = useState<Team | null>(null);

@@ -108,7 +108,7 @@ export default function NewTeamPage() {
         creator_id: user.id,
       })
       .select("id")
-      .single();
+       .single<{ id: string }>();
 
     if (error) {
       console.error(error);
