@@ -12,7 +12,6 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
     const checkSession = async () => {
       const { data } = await supabase.auth.getSession();
 
-      // dacă nu avem sesiune → trimite la /login
       if (!data.session) {
         router.push("/login");
       } else {
@@ -31,6 +30,5 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
     );
   }
 
-  // dacă user-ul e logat, afișăm conținutul paginilor protejate
   return <>{children}</>;
 }
