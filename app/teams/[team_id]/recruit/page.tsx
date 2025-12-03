@@ -36,7 +36,7 @@ export default function RecruitPage({ params }: Props) {
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  useEffect(() => {
+    useEffect(() => {
     const loadData = async () => {
       setLoading(true);
       setErrorMsg(null);
@@ -47,6 +47,7 @@ export default function RecruitPage({ params }: Props) {
       } = await supabase.auth.getUser();
 
       if (userError || !user) {
+        console.error("Recruit: user error", userError);
         setErrorMsg("Trebuie să fii logat pentru a accesa această pagină.");
         setLoading(false);
         return;
@@ -59,15 +60,18 @@ export default function RecruitPage({ params }: Props) {
         .eq("id", params.team_id)
         .maybeSingle();
 
-      if (teamErr) {
-        console.error(teamErr);
-        setErrorMsg("Nu am putut încărca detaliile echipei.");
+      console.log("Recruit: team query result =", { teamData, teamErr });
+
+      // dacă e eroare „fără rânduri” (PGRST116), o tratăm separat
+      if (teamErr && (teamErr as any).code !== "PGRST116") {
+        console.error("Recruit: teamErr", teamErr);
+        setErrorMsg(teamErr.message || "Nu am putut încărca detaliile echipei.");
         setLoading(false);
         return;
       }
 
       if (!teamData) {
-        setErrorMsg("Echipa nu există.");
+        setErrorMsg("Echipa nu există sau nu ai acces la ea.");
         setLoading(false);
         return;
       }
@@ -88,8 +92,11 @@ export default function RecruitPage({ params }: Props) {
         .select("profile_id, role");
 
       if (membersErr) {
-        console.error(membersErr);
-        setErrorMsg("Nu am putut încărca informațiile despre membri.");
+        console.error("Recruit: membersErr", membersErr);
+        setErrorMsg(
+          membersErr.message ||
+            "Nu am putut încărca informațiile despre membri."
+        );
         setLoading(false);
         return;
       }
@@ -100,9 +107,7 @@ export default function RecruitPage({ params }: Props) {
           .map((m) => m.profile_id as string)
       );
 
-      // 3) luăm toate profilurile și filtrăm pe client:
-      //    - rol = 'participant'
-      //    - nu sunt deja în nicio echipă
+      // 3) luăm toate profilurile și filtrăm pe client
       const { data: profilesData, error: profilesErr } = await supabase
         .from("profiles")
         .select(
@@ -110,8 +115,11 @@ export default function RecruitPage({ params }: Props) {
         );
 
       if (profilesErr) {
-        console.error(profilesErr);
-        setErrorMsg("Nu am putut încărca lista de participanți.");
+        console.error("Recruit: profilesErr", profilesErr);
+        setErrorMsg(
+          profilesErr.message ||
+            "Nu am putut încărca lista de participanți."
+        );
         setLoading(false);
         return;
       }
@@ -127,6 +135,7 @@ export default function RecruitPage({ params }: Props) {
 
     loadData();
   }, [params.team_id]);
+
 
   // filtrare după search (nume + skilluri)
   const filtered = useMemo(() => {
