@@ -41,19 +41,19 @@ export default function RecruitPage() {
 
   const [team, setTeam] = useState<Team | null>(null);
   const [candidates, setCandidates] = useState<Profile[]>([]);
+  const [pendingInvites, setPendingInvites] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [actionMsg, setActionMsg] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!teamId) {
-      // dacă pentru orice motiv nu avem încă teamId, nu rulăm nimic
-      return;
-    }
+    if (!teamId) return;
 
     const loadData = async () => {
       setLoading(true);
       setErrorMsg(null);
+      setActionMsg(null);
 
       const {
         data: { user },
@@ -93,7 +93,7 @@ export default function RecruitPage() {
 
       if (teamData.creator_id !== user.id) {
         setErrorMsg(
-          "Doar creatorul echipei poate căuta membri pentru această echipă."
+          "Doar creatorul echipei poate căuta și invita membri pentru această echipă."
         );
         setLoading(false);
         return;
@@ -122,7 +122,29 @@ export default function RecruitPage() {
           .map((m) => m.profile_id as string)
       );
 
-      // 3) luăm toate profilurile și filtrăm pe client
+      // 3) luăm invitațiile PENDING trimise de această echipă
+      const { data: invitesData, error: invitesErr } = await supabase
+        .from("team_invites")
+        .select("profile_id, status")
+        .eq("team_id", teamId)
+        .eq("status", "pending");
+
+      if (invitesErr) {
+        console.error("Recruit: invitesErr", invitesErr);
+        setErrorMsg(
+          invitesErr.message ||
+            "Nu am putut încărca invitațiile existente."
+        );
+        setLoading(false);
+        return;
+      }
+
+      const invitedIds = new Set(
+        (invitesData ?? []).map((i: any) => i.profile_id as string)
+      );
+      setPendingInvites(invitedIds);
+
+      // 4) luăm toate profilurile și filtrăm pe client
       const { data: profilesData, error: profilesErr } = await supabase
         .from("profiles")
         .select("id, full_name, role, skills, looking_status, links");
@@ -169,6 +191,36 @@ export default function RecruitPage() {
     });
   }, [candidates, search]);
 
+  // trimite invitație (nu adaugă direct în team_members)
+  const handleInvite = async (profileId: string) => {
+    if (!teamId) return;
+    setActionMsg(null);
+    setErrorMsg(null);
+
+    const { error } = await supabase.from("team_invites").insert({
+      team_id: teamId,
+      profile_id: profileId,
+      // status = 'pending' by default
+    });
+
+    if (error) {
+      console.error("Recruit: send invite error", error);
+      setErrorMsg(
+        error.message ||
+          "Nu am putut trimite invitația. Verifică dacă nu există deja una."
+      );
+      return;
+    }
+
+    setPendingInvites((prev) => {
+      const copy = new Set(prev);
+      copy.add(profileId);
+      return copy;
+    });
+
+    setActionMsg("Invitația a fost trimisă.");
+  };
+
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100">
       {/* HERO */}
@@ -182,9 +234,8 @@ export default function RecruitPage() {
             Caută membri pentru echipa ta
           </h1>
           <p className="text-sm text-slate-300 max-w-xl">
-            Vezi participanții care nu sunt încă într-o echipă și filtrează-i 
-            după skill-uri sau status. Poți folosi GitHub / LinkedIn pentru a-i 
-            contacta.
+            Vezi participanții care nu sunt încă într-o echipă și filtrează-i
+            după skill-uri sau status. Poți să le trimiți invitații în echipă.
           </p>
           {team && (
             <p className="text-xs text-slate-400">
@@ -206,6 +257,12 @@ export default function RecruitPage() {
         {!loading && errorMsg && (
           <p className="text-sm text-red-400 border border-red-500/40 bg-red-900/30 rounded-lg px-3 py-2">
             {errorMsg}
+          </p>
+        )}
+
+        {!loading && actionMsg && !errorMsg && (
+          <p className="text-sm text-emerald-300 border border-emerald-500/40 bg-emerald-900/20 rounded-lg px-3 py-2">
+            {actionMsg}
           </p>
         )}
 
@@ -236,6 +293,7 @@ export default function RecruitPage() {
             <div className="mt-4 grid gap-4 md:grid-cols-2">
               {filtered.map((p) => {
                 const skillsArr = normalizeSkills(p.skills);
+                const invited = pendingInvites.has(p.id);
 
                 return (
                   <article
@@ -295,6 +353,20 @@ export default function RecruitPage() {
                         </a>
                       )}
                     </div>
+
+                    <div className="mt-2">
+                      <button
+                        disabled={invited}
+                        onClick={() => handleInvite(p.id)}
+                        className={`w-full rounded-lg px-3 py-1.5 text-xs font-semibold ${
+                          invited
+                            ? "border border-purple-500/40 bg-purple-900/30 text-purple-200 cursor-default"
+                            : "bg-purple-500 text-slate-950 hover:bg-purple-400"
+                        }`}
+                      >
+                        {invited ? "Invitație trimisă" : "Trimite invitație"}
+                      </button>
+                    </div>
                   </article>
                 );
               })}
@@ -305,8 +377,7 @@ export default function RecruitPage() {
                 filtered.length === 0 && (
                   <p className="text-sm text-slate-400 col-span-full">
                     Niciun participant nu corespunde filtrului curent. Încearcă
-                    alte cuvinte cheie (ex: &quot;React&quot;, &quot;backend&quot;,
-                    &quot;design&quot;...).
+                    alte cuvinte cheie (ex: „React”, „backend”, „design”...).
                   </p>
                 )}
             </div>
