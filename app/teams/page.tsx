@@ -148,12 +148,14 @@ export default function TeamsPage() {
                 </div>
 
                 <div className="flex flex-wrap gap-2 text-xs">
-                  <Link
-                    href={`/teams/${team.id}/project`}
-                    className="inline-flex items-center gap-1 rounded-lg border border-slate-700 bg-slate-900 px-3 py-1.5 font-semibold text-slate-100 hover:border-emerald-400 hover:text-emerald-200"
-                  >
-                    📁 Proiectul echipei
-                  </Link>
+                  {isCreator && (
+                    <Link
+                      href={`/teams/${team.id}/project`}
+                      className="inline-flex items-center gap-1 rounded-lg bg-emerald-500 px-3 py-1.5 font-semibold text-slate-950 hover:bg-emerald-400"
+                    >
+                      ✏️ Editează proiectul
+                    </Link>
+                  )}
                   
                 
                 </div>
